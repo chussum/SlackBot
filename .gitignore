@@ -1,0 +1,7 @@
+.DS_Store
+.idea
+.tags*
+/*.lock
+/build
+/node_modules
+/vendor
