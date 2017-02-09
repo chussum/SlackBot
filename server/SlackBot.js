@@ -50,24 +50,14 @@ export default class SlackBot {
                     } else if (text.search(/배고파|배고픔|뭐\s?먹을까|뭐\s?먹지|맛집\s?추천|식사\s+추천|저녁\s+추천/) !== -1) {
                         this.recommandRestaurant()
                             .then(content => this.sendMessage(content, channel, user));
-                    } else {
-                        let lastIndex = text.trim().search(/띠\s?운세/);
-                        if (lastIndex != -1) {
-                            let filteredText = text.substring(0, lastIndex + 1);
-                            let words = filteredText.split(' ');
-                            let category;
-                            for (let i in words) {
-                                let word = words[i];
-                                if (word.search(/띠\s?운세$/)) {
-                                    category = word;
-                                }
-                            }
-                            if (!category || category.length === 1) {
-                                break;
-                            }
-                            this.todayFortune(category)
-                                .then(content => this.sendMessage(content, channel, user));
-                        }
+                    } else if (text.trim().search(/띠\s?운세/) !== -1) {
+                        let category = this.filterFortuneCategory(text, /띠\s?운세/);
+                        this.todayFortune(category)
+                            .then(content => this.sendMessage(content, channel, user));
+                    } else if (text.trim().search(/리\s?운세/) !== -1) {
+                        let category = this.filterFortuneCategory(text, /리\s?운세/);
+                        this.todayFortune(category)
+                            .then(content => this.sendMessage(content, channel, user));
                     }
                     break;
             }
@@ -164,18 +154,42 @@ export default class SlackBot {
         });
     }
 
+    filterFortuneCategory(text, regex) {
+        let lastIndex = text.trim().search(regex);
+        if (lastIndex != -1) {
+            let filteredText = text.substring(0, lastIndex + 1);
+            let words = filteredText.split(' ');
+            let category;
+            for (let i in words) {
+                let word = words[i];
+                if (word.search(regex)) {
+                    category = word;
+                }
+            }
+            if (!category || category.length === 1) {
+                return;
+            }
+
+            return category;
+        }
+    }
+
     formatForturnContent(category, data) {
         let filterContent = '';
         try {
             let summary = data.result.day.summary;
             let content = data.result.day.content;
-            let fortuneContent = [];
-            for (let i in content) {
-                let item = content[i];
-                fortuneContent.push('- ' + item.year + '\n' + item.desc);
+            if (summary) {
+                let fortuneContent = [];
+                for (let i in content) {
+                    let item = content[i];
+                    fortuneContent.push('- ' + item.year + '\n' + item.desc);
+                }
+                fortuneContent = fortuneContent.join("\n");
+                filterContent = `${category} 오늘의 운세\n\n${summary}\n\n${fortuneContent}`;
+            } else {
+                filterContent = `${category}(${content.month}) 오늘의 운세\n\n${content.desc}`;
             }
-            fortuneContent = fortuneContent.join("\n");
-            filterContent = `[${category} 오늘의 운세]\n${summary}\n\n${fortuneContent}`;
         } catch (e) {
             filterContent = category + ' 운세를 가져올 수 없어요~'
         }
