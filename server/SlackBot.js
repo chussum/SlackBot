@@ -38,27 +38,11 @@ export default class SlackBot {
             if (data.bot_id) return;
             switch (data.type) {
                 case 'message':
-                    let channel = this.channelIdToName(data.channel);
                     let user = this.userIdToName(data.user);
-                    let text = data.text || '';
-                    if (text.search(/내일\s?점심/) !== -1 || text.search(/내일\s?식단표/) !== -1) {
-                        this.lunchMenu('tomorrow')
-                            .then(content => this.sendMessage(content, channel, user));
-                    } else if (text.includes('점심') || text.includes('식단표')) {
-                        this.lunchMenu('today')
-                            .then(content => this.sendMessage(content, channel, user));
-                    } else if (text.search(/배고파|배고픔|뭐\s?먹을까|뭐\s?먹지|맛집\s?추천|식사\s+추천|저녁\s+추천/) !== -1) {
-                        this.recommandRestaurant()
-                            .then(content => this.sendMessage(content, channel, user));
-                    } else if (text.trim().search(/띠\s?운세/) !== -1) {
-                        let category = this.filterFortuneCategory(text, /띠\s?운세/);
-                        this.todayFortune(category)
-                            .then(content => this.sendMessage(content, channel, user));
-                    } else if (text.trim().search(/리\s?운세/) !== -1) {
-                        let category = this.filterFortuneCategory(text, /리\s?운세/);
-                        this.todayFortune(category)
-                            .then(content => this.sendMessage(content, channel, user));
-                    }
+                    let channel = this.channelIdToName(data.channel);
+                    let promise = this.getRespondMessage(data.text);
+
+                    promise && promise.then(content => this.sendMessage(content, channel, user));
                     break;
             }
         });
@@ -75,6 +59,26 @@ export default class SlackBot {
 
     addJob(params, content) {
         new cron.CronJob(params, () => this.sendMessage(content, this.general), () => {}, true, 'Asia/Seoul');
+    }
+
+    getRespondMessage(text = '') {
+        let promise;
+
+        if (text.trim().search(/띠\s?운세/) !== -1) {
+            let category = this.filterFortuneCategory(text, /띠\s?운세/);
+            promise = this.todayFortune(category);
+        } else if (text.trim().search(/리\s?운세/) !== -1) {
+            let category = this.filterFortuneCategory(text, /리\s?운세/);
+            promise = this.todayFortune(category);
+        } else if (text.search(/배고파|배고픔|뭐\s?먹을까|뭐\s?먹지|맛집\s?추천|식사\s+추천|저녁\s+추천/) !== -1) {
+            promise = this.recommandRestaurant();
+        } else if (text.search(/내일\s?점심/) !== -1 || text.search(/내일\s?식단표/) !== -1) {
+            promise = this.lunchMenu('tomorrow');
+        } else if (text.includes('점심') || text.includes('식단표')) {
+            promise = this.lunchMenu('today');
+        }
+
+        return promise;
     }
 
     lunchMenu(category) {
@@ -146,7 +150,7 @@ export default class SlackBot {
             })
             .then(response => {
                 let data = eval('(' + response.data + ')');
-                resolve(this.formatForturnContent(category, data));
+                resolve(this.formatFortuneContent(category, data));
             })
             .catch(() => {
                 resolve('운세 서버에서 데이터를 받을 수 없습니다.');
@@ -174,7 +178,7 @@ export default class SlackBot {
         }
     }
 
-    formatForturnContent(category, data) {
+    formatFortuneContent(category, data) {
         let filterContent = '';
         try {
             let summary = data.result.day.summary;
@@ -203,8 +207,8 @@ export default class SlackBot {
             channels = channels._value.channels;
             for (let i in channels) {
                 let channel = channels[i];
-                if (channels[i].id == id) {
-                    return channels[i].name;
+                if (channel.id == id) {
+                    return channel.name;
                 }
             }
         } catch (e) {
@@ -217,9 +221,10 @@ export default class SlackBot {
         let users = this.bot.getUsers();
         try {
             users = users._value.members;
-            for (var i=0; i < users.length; i++ ) {
-                if (users[i].id == id) {
-                    return users[i].name;
+            for (let i in users) {
+                let user = users[i];
+                if (user.id == id) {
+                    return user.name;
                 }
             }
         } catch (e) {
