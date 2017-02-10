@@ -66,10 +66,10 @@ export default class SlackBot {
 
         if (text.trim().search(/띠\s?운세/) !== -1) {
             let category = this.filterFortuneCategory(text, /띠\s?운세/);
-            promise = this.todayFortune(category);
+            promise = this.todayFortune(category, 103);
         } else if (text.trim().search(/리\s?운세/) !== -1) {
             let category = this.filterFortuneCategory(text, /리\s?운세/);
-            promise = this.todayFortune(category);
+            promise = this.todayFortune(category, 105);
         } else if (text.search(/배고파|배고픔|뭐\s?먹을까|뭐\s?먹지|맛집\s?추천|식사\s+추천|저녁\s+추천/) !== -1) {
             promise = this.recommendRestaurant();
         } else if (text.search(/내일\s?점심/) !== -1 || text.search(/내일\s?식단표/) !== -1) {
@@ -139,13 +139,13 @@ export default class SlackBot {
         });
     }
 
-    todayFortune(category) {
+    todayFortune(category, pkId) {
         return new Promise(resolve => {
             axios.get('https://m.search.naver.com/p/csearch/content/apirender.nhn', {
                 params: {
                     where: 'm',
                     key: 'FortuneAPI',
-                    pkid: 105,
+                    pkid: pkId,
                     q: category
                 }
             })
