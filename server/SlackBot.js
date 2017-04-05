@@ -48,8 +48,8 @@ export default class SlackBot {
         });
 
         // handle disconnections
-        this.bot.on('close', (data) => {
-            console.log("Connection closed... Reconnecting.")
+        this.bot.on('close', () => {
+            console.log("Connection closed... Reconnecting.");
             this.bot.login();
         });
     }
