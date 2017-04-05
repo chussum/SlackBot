@@ -46,6 +46,12 @@ export default class SlackBot {
                     break;
             }
         });
+
+        // handle disconnections
+        this.bot.on('close', (data) => {
+            console.log("Connection closed... Reconnecting.")
+            this.bot.login();
+        });
     }
 
     registerCronJobs() {
