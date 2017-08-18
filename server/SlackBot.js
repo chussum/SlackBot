@@ -139,7 +139,7 @@ export default class SlackBot {
     }
 
     callSlackBot(message) {
-        let hour = Number(moment().format('H'));
+        let hour = Number(moment().format('HH'));
         if (hour >= 19) return;
         if (!message) {
             let randStr = [':weble1:', ':weble7:', ':ok_woman::skin-tone-2:'];
