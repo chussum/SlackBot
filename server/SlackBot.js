@@ -120,19 +120,19 @@ export default class SlackBot {
             promise = this.callSlackBot(':weblelogo: 위블 프론트/뉴어드민 배포 취소 :weble7:');
         } else if (text.search(/(\w+) pushed new tag <.+\d+.\d+.\d+> to <.+weble\/api>/) !== -1) {
             const data = text.match(/(\w+) pushed new tag <.+(\d+.\d+.\d+)> to <.+weble\/api>/);
-            const version = data && data.length === 2 ? data[1] + ' ' : '';
+            const version = data && data.length && data[2] ? data[2] + ' ' : '';
             promise = this.callSlackBot(':weblelogo: 위블 API ' + version + '배포 중 :weble11:');
         } else if (text.search(/<.+weble\/api>: Pipeline <.+#\d+> of <.+\d+.\d+.\d+> tag by (\w+) passed/) !== -1) {
             const data = text.match(/<.+weble\/api>: Pipeline <.+#\d+> of <.+(\d+.\d+.\d+)> tag by (\w+) passed/);
-            const version = data && data.length ? data[0] + ' ' : '';
+            const version = data && data.length && data[1] ? data[1] + ' ' : '';
             promise = this.callSlackBot(':weblelogo: 위블 API ' + version + '배포 완료 :weble4:');
         } else if (text.search(/<.+weble\/api>: Pipeline <.+#\d+> of <.+\d+.\d+.\d+> tag by (\w+) failed/) !== -1) {
             const data = text.match(/<.+weble\/api>: Pipeline <.+#\d+> of <.+(\d+.\d+.\d+)> tag by (\w+) failed/);
-            const version = data && data.length ? data[0] + ' ' : '';
+            const version = data && data.length && data[1] ? data[1] + ' ' : '';
             promise = this.callSlackBot(':weblelogo: 위블 API ' + version + '배포 실패 :weble3:');
         } else if (text.search(/<.+weble\/api>: Pipeline <.+#\d+> of <.+\d+.\d+.\d+> tag by (\w+) canceled/) !== -1) {
             const data = text.match(/<.+weble\/api>: Pipeline <.+#\d+> of <.+(\d+.\d+.\d+)> tag by (\w+) canceled/);
-            const version = data && data.length ? data[0] + ' ' : '';
+            const version = data && data.length && data[1] ? data[1] + ' ' : '';
             promise = this.callSlackBot(':weblelogo: 위블 API ' + version + '배포 취소 :weble7:');
         }
         return promise;
