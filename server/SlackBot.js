@@ -41,19 +41,24 @@ export default class SlackBot {
 
     registerEvents() {
         this.bot.on('message', (data) => {
-            if (data.bot_id && this.options.webhooks.indexOf(data.bot_id) === -1) return;
+            if (data.bot_id && this.options.webhooks.indexOf(data.bot_id) === -1) {
+                return;
+            }
+
             switch (data.type) {
                 case 'message': {
                     let user = this.userIdToName(data.user);
                     let channel = this.channelIdToName(data.channel);
                     let text = data.text;
-                    if (data.bot_id && data.text === '' && data.attachments && data.attachments.length) {
+                    if (data.bot_id && text === '' && data.attachments && data.attachments.length) {
                         let attach = data.attachments.shift();
                         attach && attach.text && (text = attach.text);
-                        text && (channel = this.general);
+                    }
+                    if (data.bot_id && text) {
+                        channel = this.general;
                     }
                     let promise = this.getRespondMessage(text);
-                    if (promise && (user || (channel && channel == this.general))) {
+                    if (promise && (user || (channel && channel === this.general))) {
                         promise && promise.then(content => this.sendMessage(content, channel, user));
                     }
                     break;
