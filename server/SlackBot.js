@@ -53,7 +53,7 @@ export default class SlackBot {
                         text && (channel = this.general);
                     }
                     let promise = this.getRespondMessage(text);
-                    if (promise && (user || (channel && channel === this.general))) {
+                    if (promise && (user || (channel && channel == this.general))) {
                         promise && promise.then(content => this.sendMessage(content, channel, user));
                     }
                     break;
@@ -139,8 +139,8 @@ export default class SlackBot {
     }
 
     callSlackBot(message) {
-        let hour = Number(moment().format('h'));
-        if (hour >= 20) return;
+        // let hour = Number(moment().format('h'));
+        // if (hour >= 20) return;
         if (!message) {
             let randStr = [':weble1:', ':weble7:', ':ok_woman::skin-tone-2:'];
             message = randStr[Math.floor(Math.random() * randStr.length)];
@@ -342,10 +342,6 @@ export default class SlackBot {
     }
 
     sendMessage(content, channel, user, params = {}) {
-        if (!content) {
-            return;
-        }
-
         if (channel) {
             this.bot
                 .postMessageToChannel(
