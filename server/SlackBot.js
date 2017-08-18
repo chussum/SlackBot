@@ -2,11 +2,14 @@ import Bot from 'slackbots';
 import axios from 'axios';
 import cheerio from 'cheerio';
 import cron from 'cron';
+import moment from 'moment';
 
 export default class SlackBot {
     bot;
-    options;
     general;
+    options = {
+        webhooks: []
+    };
     payloads = {
         icon_url: 'https://avatars.slack-edge.com/2017-01-27/132579999137_0a067c94a9a07d7de352_72.png'
     };
@@ -14,7 +17,10 @@ export default class SlackBot {
     constructor(general = 'general', options = {}, payloads = {}) {
         // init options
         this.general = general;
-        this.options = options;
+        this.options = {
+            ...this.options,
+            ...options
+        };
         this.payloads = {
             ...this.payloads,
             ...payloads
@@ -35,15 +41,23 @@ export default class SlackBot {
 
     registerEvents() {
         this.bot.on('message', (data) => {
-            if (data.bot_id) return;
+            if (data.bot_id && this.options.webhooks.indexOf(data.bot_id) === -1) return;
             switch (data.type) {
-                case 'message':
+                case 'message': {
                     let user = this.userIdToName(data.user);
                     let channel = this.channelIdToName(data.channel);
-                    let promise = this.getRespondMessage(data.text);
-
-                    promise && promise.then(content => this.sendMessage(content, channel, user));
+                    let text = data.text;
+                    if (data.bot_id && data.text === '' && data.attachments && data.attachments.length) {
+                        let attach = data.attachments.shift();
+                        attach && attach.text && (text = attach.text);
+                        text && (channel = this.general);
+                    }
+                    let promise = this.getRespondMessage(text);
+                    if (promise && (user || (channel && channel === this.general))) {
+                        promise && promise.then(content => this.sendMessage(content, channel, user));
+                    }
                     break;
+                }
             }
         });
 
@@ -56,20 +70,24 @@ export default class SlackBot {
 
     registerCronJobs() {
         // Sec Min Hour Day(1-31) Mon DayOfWeek(0-6)
-        this.addJob('0 50 18 * * 1-5', '퇴근 10분 전');
-        this.addJob('0 0 19 * * 1-5', `빠빠빠 빠빠빠 빠빠빠빠 빠빠빠 빠빠빠 빠 빠빠빠
-빠빠빠 빠빠빠 빠빠빠빠 빠빠빠 빠빠빠 빠 빠빠빠
-지금은 우리가 헤어져야 할 시간 다음에 또 만나요
-지금은 우리가 헤어져야 할 시간 다음에 다시 만나요`);
+        this.addJob('0 50 18 * * 1-5', ':weble6: 퇴근 10분 전');
+        this.addJob('0 0 19 * * 1-4', ':weble5: 남은 일은 내일의 나에게.. :wow:');
+        this.addJob('0 0 19 * * 5', ':weble10: 한 주의 마지막, 금요일 :weble6:', {
+            "attachments": [{
+                "text": "혼자_있고_싶어요.png",
+                "image_url": "https://image.ibb.co/gxKxVQ/off_work.png"
+            }],
+        });
     }
 
-    addJob(params, content) {
-        new cron.CronJob(params, () => this.sendMessage(content, this.general), () => {}, true, 'Asia/Seoul');
+    addJob(params, content, options = {}) {
+        new cron.CronJob(params, () => {
+            this.sendMessage(content, this.general, null, options);
+        }, () => {}, true, 'Asia/Seoul');
     }
 
     getRespondMessage(text = '') {
         let promise;
-
         if (text.trim().search(/띠\s?운세/) !== -1) {
             let category = this.filterFortuneCategory(text, /띠\s?운세/);
             promise = this.todayFortune(category, 103);
@@ -78,90 +96,173 @@ export default class SlackBot {
             promise = this.todayFortune(category, 105);
         } else if (text.search(/배고파|배고픔|뭐\s?먹을까|뭐\s?먹지|맛집\s?추천|식사\s+추천|저녁\s+추천/) !== -1) {
             promise = this.recommendRestaurant();
+        } else if (text.search(/(내일\s?)?모레\s?점심/) !== -1 || text.search(/(내일\s?)?모레\s?식단표/) !== -1) {
+            promise = this.lunchMenu('day-after-tomorrow');
         } else if (text.search(/내일\s?점심/) !== -1 || text.search(/내일\s?식단표/) !== -1) {
             promise = this.lunchMenu('tomorrow');
         } else if (text.includes('점심') || text.includes('식단표')) {
             promise = this.lunchMenu('today');
+        } else if (text.replace('<', '').replace('>', '').search(/^https?:\/\/(www\.)?weble\.net\/campaign\/img\.php\?p=/) !== -1) {
+            promise = this.checkSponsorBanner(text.replace('<', '').replace('>', ''));
+        } else if (text.search(/배포/) !== -1) {
+            promise = this.callSlackBot();
+        } else if (text.search(/위블/) !== -1) {
+            promise = this.callSlackBot(':wow:');
+        } else if (text.search(/병원/) !== -1) {
+            promise = this.callSlackBot(':sad2:');
+        } else if (text.search(/(\w+) pushed to branch <.+master> of <.+weble\/porsche>/) !== -1) {
+            promise = this.callSlackBot(':weblelogo: 위블 프론트/뉴어드민 배포 중 :weble11:');
+        } else if (text.search(/<.+weble\/porsche>: Pipeline <.+#\d+> of <.+master> branch by (\w+) passed/) !== -1) {
+            promise = this.callSlackBot(':weblelogo: 위블 프론트/뉴어드민 배포 완료 :weble4:');
+        } else if (text.search(/<.+weble\/porsche>: Pipeline <.+#\d+> of <.+master> branch by (\w+) failed/) !== -1) {
+            promise = this.callSlackBot(':weblelogo: 위블 프론트/뉴어드민 배포 실패 :weble3:');
+        } else if (text.search(/<.+weble\/porsche>: Pipeline <.+#\d+> of <.+master> branch by (\w+) canceled/) !== -1) {
+            promise = this.callSlackBot(':weblelogo: 위블 프론트/뉴어드민 배포 취소 :weble7:');
+        } else if (text.search(/(\w+) pushed new tag <.+\d+.\d+.\d+> to <.+weble\/api>/) !== -1) {
+            const data = text.match(/(\w+) pushed new tag (\d+.\d+.\d+) to <.+weble\/api>/);
+            const version = data && data.length === 2 ? data[1] + ' ' : '';
+            promise = this.callSlackBot(':weblelogo: 위블 API ' + version + '배포 중 :weble11:');
+        } else if (text.search(/<.+weble\/api>: Pipeline <.+#\d+> of <.+\d+.\d+.\d+> tag by (\w+) passed/) !== -1) {
+            const data = text.match(/<.+weble\/api>: Pipeline <.+#\d+> of <.+(\d+.\d+.\d+)> tag by (\w+) passed/);
+            const version = data && data.length ? data[0] + ' ' : '';
+            promise = this.callSlackBot(':weblelogo: 위블 API ' + version + '배포 완료 :weble4:');
+        } else if (text.search(/<.+weble\/api>: Pipeline <.+#\d+> of <.+\d+.\d+.\d+> tag by (\w+) failed/) !== -1) {
+            const data = text.match(/<.+weble\/api>: Pipeline <.+#\d+> of <.+(\d+.\d+.\d+)> tag by (\w+) failed/);
+            const version = data && data.length ? data[0] + ' ' : '';
+            promise = this.callSlackBot(':weblelogo: 위블 API ' + version + '배포 실패 :weble3:');
+        } else if (text.search(/<.+weble\/api>: Pipeline <.+#\d+> of <.+\d+.\d+.\d+> tag by (\w+) canceled/) !== -1) {
+            const data = text.match(/<.+weble\/api>: Pipeline <.+#\d+> of <.+(\d+.\d+.\d+)> tag by (\w+) canceled/);
+            const version = data && data.length ? data[0] + ' ' : '';
+            promise = this.callSlackBot(':weblelogo: 위블 API ' + version + '배포 취소 :weble7:');
         }
-
         return promise;
     }
 
-    lunchMenu(category) {
-        let request = (category == 'today') ? '점심' : '내일 점심';
+    callSlackBot(message) {
+        let hour = Number(moment().format('H'));
+        if (hour >= 19) return;
+        if (!message) {
+            let randStr = [':weble1:', ':weble7:', ':ok_woman::skin-tone-2:'];
+            message = randStr[Math.floor(Math.random() * randStr.length)];
+        }
         return new Promise(resolve => {
-            axios.post('http://api.hyungdew.com/kakao-bot/message',
-                require('querystring').stringify({
-                    user_key: 'slackBot',
-                    type: 'text',
-                    content: request
+            resolve(message);
+        });
+    }
+
+    checkSponsorBanner(url) {
+        return new Promise(resolve => {
+            axios
+                .get('https://api.weble.net/campaigns/banner-check', {
+                        params: {
+                            url: url
+                        }
+                    }
+                )
+                .then(response => {
+                    let {campaignId, userId, version} = response.data;
+                    let adminUrl = 'https://admin.new.weble.net';
+                    let campaignLink = campaignId ? `<${adminUrl}/campaigns/${campaignId}/manage|${campaignId}>` : '알 수 없음';
+                    let userLink = userId ? `<${adminUrl}/users/${userId}|${userId}>` : '알 수 없음';
+                    version = version || '알 수 없음';
+                    let message = `캠페인: ${campaignLink}
+유저: ${userLink}
+스폰서배너 버전: ${version}`;
+
+                    resolve(message);
                 })
-            )
-            .then(response => {
-                if (!response.data || !response.data.message || !response.data.message.text) {
-                    throw new Error('no data.');
-                }
-                resolve(response.data.message.text);
-            })
-            .catch(() => {
-                resolve('점심 서버에서 데이터를 받을 수 없습니다.');
-            });
+                .catch(() => {
+                    resolve('위블 API 서버에서 데이터를 받을 수 없습니다.');
+                });
+        });
+    }
+
+    lunchMenu(category) {
+        let title;
+        switch (category) {
+            case 'today': {
+                title = '오늘의 점심';
+                break;
+            }
+            case 'tomorrow': {
+                title = '내일의 점심';
+                break;
+            }
+            default: {
+                title = '모레 점심';
+                break;
+            }
+        }
+        return new Promise(resolve => {
+            axios
+                .get('https://lunch.hyungdew.com/api/lunch/' + category)
+                .then(response => {
+                    if (!response.data || !response.data.foods) {
+                        throw new Error('no data.');
+                    }
+                    resolve(title + ' / ' + response.data.category + '\n\n' + response.data.foods);
+                })
+                .catch(() => {
+                    resolve('식단표가 없어요. :weble3:');
+                });
         });
     }
 
     recommendRestaurant() {
         return new Promise((resolve, reject) => {
-            axios.get('http://section.blog.naver.com/sub/SearchBlog.nhn', {
-                params: {
-                    'type': 'post',
-                    'option.keyword': '논현 학동 맛집',
-                }
-            })
-            .then(response => {
-                let html = response.data;
-                if (!html) {
-                    reject('no data.');
-                }
-                return cheerio.load(html);
-            })
-            .then($ => {
-                let result = [];
-                $('.search_list li h5 a').each(function() {
-                    result.push({title: $(this).text().trim(), href: $(this).attr('href')});
-                });
-                result.sort(() => .5 - Math.random());
-                return result.shift();
-            })
-            .then(result => {
-                if (!result) {
-                    reject('server error.');
-                }
-                resolve('<' + result.href + '|' + result.title + '>');
+            axios
+                .get('http://section.blog.naver.com/sub/SearchBlog.nhn', {
+                    params: {
+                        'type': 'post',
+                        'option.keyword': '논현 학동 맛집',
+                    }
+                })
+                .then(response => {
+                    let html = response.data;
+                    if (!html) {
+                        reject('no data.');
+                    }
+                    return cheerio.load(html);
+                })
+                .then($ => {
+                    let result = [];
+                    $('.search_list li h5 a').each(function() {
+                        result.push({title: $(this).text().trim(), href: $(this).attr('href')});
+                    });
+                    result.sort(() => .5 - Math.random());
+                    return result.shift();
+                })
+                .then(result => {
+                    if (!result) {
+                        reject('server error.');
+                    }
+                    resolve('<' + result.href + '|' + result.title + '>');
 
-            })
-            .catch(() => {
-                reject('server error.');
-            });
+                })
+                .catch(() => {
+                    reject('server error.');
+                });
         });
     }
 
     todayFortune(category, pkId) {
         return new Promise(resolve => {
-            axios.get('https://m.search.naver.com/p/csearch/content/apirender.nhn', {
-                params: {
-                    where: 'm',
-                    key: 'FortuneAPI',
-                    pkid: pkId,
-                    q: category
-                }
-            })
-            .then(response => {
-                let data = eval('(' + response.data + ')');
-                resolve(this.formatFortuneContent(category, data));
-            })
-            .catch(() => {
-                resolve('운세 서버에서 데이터를 받을 수 없습니다.');
-            });
+            axios
+                .get('https://m.search.naver.com/p/csearch/content/apirender.nhn', {
+                    params: {
+                        where: 'm',
+                        key: 'FortuneAPI',
+                        pkid: pkId,
+                        q: category
+                    }
+                })
+                .then(response => {
+                    let data = eval('(' + response.data + ')');
+                    resolve(this.formatFortuneContent(category, data));
+                })
+                .catch(() => {
+                    resolve('운세 서버에서 데이터를 받을 수 없습니다.');
+                });
         });
     }
 
@@ -240,13 +341,20 @@ export default class SlackBot {
         return undefined;
     }
 
-    sendMessage(content, channel, user) {
+    sendMessage(content, channel, user, params = {}) {
+        if (!content) {
+            return;
+        }
+
         if (channel) {
             this.bot
                 .postMessageToChannel(
                     channel,
                     content,
-                    this.payloads,
+                    {
+                        ...this.payloads,
+                        ...params,
+                    },
                     () => {}
                 );
         } else if (user) {
@@ -254,7 +362,10 @@ export default class SlackBot {
                 .postMessageToUser(
                     user,
                     content,
-                    this.payloads,
+                    {
+                        ...this.payloads,
+                        ...params,
+                    },
                     () => {}
                 );
         }
