@@ -97,7 +97,7 @@ export default class SlackBot {
         } else if (text.trim().search(/리\s?운세/) !== -1) {
             let category = this.filterFortuneCategory(text, /리\s?운세/);
             promise = this.todayFortune(category, 105);
-        } else if (text.search(/배고파|배고픔|뭐\s?먹을까|뭐\s?먹지|맛집\s?추천|식사\s+추천|저녁\s+추천/) !== -1) {
+        } else if (text.search(/배고파|배고픔|뭐\s?먹을까|뭐\s?드실까|뭐\s?먹지|맛집\s?추천|식사\s?추천|점심\s?추천|저녁\s?추천/) !== -1) {
             promise = this.recommendRestaurant('신촌 교대 맛집');
         } else if (text.search(/병원/) !== -1) {
             promise = this.callSlackBot(':cry:');
@@ -140,7 +140,7 @@ export default class SlackBot {
               .then($ => {
                   let result = [];
                   $('#elThumbnailResultArea li.sh_blog_top a.sh_blog_title').each((idx, el) => {
-                      result.push({title: $(el).text().trim(), href: $(el).attr('href')});
+                      result.push({title: ($(el).text() || '').trim(), href: $(el).attr('href')});
                   });
                   resolve(result);
               })
@@ -167,7 +167,7 @@ export default class SlackBot {
                     let posts = [];
                     for (let i in filtered) {
                         const post = filtered[i];
-                        posts.push('<' + post.href + '|' + post.title + '>');
+                        posts.push('<' + post.href + '|' + post.title.replace(/>/g, '&gt;').replace(/</g, '&lt;').replace(/&/g, '&amp;') + '>');
                     }
                     resolve(posts.join('\n'));
                 })
