@@ -11,6 +11,7 @@ export default class SlackBot {
     options = {
         channel: 'general',
         webhooks: [],
+        simsimiKey: '',
         payloads: {
             icon_url: '',
         }
@@ -101,8 +102,34 @@ export default class SlackBot {
             promise = this.recommendRestaurant('신촌 교대 맛집');
         } else if (text.search(/병원/) !== -1) {
             promise = this.callSlackBot(':cry:');
+        } else if (text.search(/라니야|란이야|@rani/) !== -1) {
+            promise = this.callSimsimi();
         }
         return promise;
+    }
+
+    callSimsimi(message) {
+      if (!this.options.simsimiKey) {
+          return;
+      }
+      return new Promise((resolve) => {
+        axios
+          .get('http://sandbox.api.simsimi.com/request.p', {
+            params: {
+              key: this.options.simsimiKey,
+              lc: 'ko',
+              ft: 0.0,
+              text: message,
+            }
+          })
+          .then(response => {
+            let data = response.data;
+            resolve(data.response);
+          })
+          .catch(() => {
+            resolve(':raniok:');
+          });
+      });
     }
 
     callSlackBot(message) {
